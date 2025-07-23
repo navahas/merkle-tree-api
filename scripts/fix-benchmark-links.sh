@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
-
 set -e
 
 SRC="target/criterion"
-DEST="$SRC/benchmarks"
-FILE="target/criterion/report/index.html"
+DEST="criterion"
+REPORT_SRC="$SRC/report/index.html"
+REPORT_DEST="$DEST/index.html"
 
 mkdir -p "$DEST"
 
-for dir in "$SRC"/*/; do
-  name=$(basename "$dir")
-  if [ "$name" != "report" ] && [ "$name" != "benchmarks" ]; then
-    echo "Moving $name → benchmarks/"
-    mv "$dir" "$DEST/"
-  fi
-done
+echo "Copying benchmark results to ./$DEST"
+cp -r "$SRC"/* "$DEST/"
 
-echo "Benchmark folders moved to: $DEST"
+# Rewrite links to assume everything is served from /benchmarks
+# So: href="../add_leaf/..." → href="add_leaf/..."
+sed -i.bak -E 's|href="\.\./([^"]+)"|href="\1"|g' "$DEST/report/index.html"
 
-sed -i.bak -E 's|href="\.\./([^"]+)"|href="/benchmarks/\1"|g' "$FILE"
-cp "$FILE" "$DEST/index.html"
+# Copy the patched index to top-level so it's served at /benchmarks/index.html
+cp "$DEST/report/index.html" "$REPORT_DEST"
 
-echo "Updated links in $FILE (backup saved as $FILE.bak)"
+echo "Updated index.html and fixed links"

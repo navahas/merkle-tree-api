@@ -181,7 +181,7 @@ async fn main() {
         .route("/get-root", get(get_root))
         .route("/get-proof", post(get_proof))
         .route("/", get(redirect_to_benchmarks)) // <--- redirect root for criterion
-        .nest_service("/benchmarks", get_service(ServeDir::new("target/criterion/benchmarks")))
+        .nest_service("/benchmarks", get_service(ServeDir::new("criterion")))
         .layer(CorsLayer::permissive())
         .with_state(state);
 

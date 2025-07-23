@@ -110,6 +110,7 @@ curl -X POST $BASE_URL/get-proof \
 .
 ├── benches/                      # Criterion benchmarks (HTTP client tests)
 │   └── api_benchmark.rs          # Async benchmark tests using reqwest + Criterion
+├── criterion/                    # Criterion benchmarks generated through script to serve
 ├── Cargo.toml
 ├── Cargo.lock
 ├── Dockerfile

@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=build /app/target/release/merkle-tree-api ./
 
-COPY target/criterion/ ./target/criterion/
+COPY criterion/ ./criterion/
 # COPY --from=build /app/target/criterion/report ./public/benchmarks
 
 # Define port and entrypoint

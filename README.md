@@ -40,6 +40,9 @@ cargo test merkle_tree::
 
 # Only tests from patricia_merkle.rs
 cargo test patricia_merkle::
+
+# Only tests from verkle_tree.rs
+cargo test patricia_merkle::
 ```
 
 ### Run

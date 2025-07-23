@@ -3,19 +3,21 @@
 The AI tools used were ChatGPT-4o, Gemini, and Claude 4 via desktop chat
 interfaces. While they were helpful in answering isolated questions, their
 support was generally shallow when it came to deeper Rust
-internals—particularly around Tokio and async behavior, which acted like a
-black box. As expected, AI struggled to identify runtime-specific issues unless
+internals.
+
+As expected, AI struggled to identify runtime-specific issues unless
 explicitly pointed toward them. In practice, manual debugging and direct
 consultation of documentation (e.g., reqwest, tokio, criterion) were essential
 and far more effective.
 
-Most prompts focused on research into Merkle trees and explored conceptual
-parallels like Git DAGs, how Ethereum structures them, and ideas for scalable
-implementations (e.g., rollups using max-sized Merkle trees). These were more
-exploratory and architectural in nature.
+Most conversations took place in ephemeral chats and focused on research into
+Merkle trees, exploring conceptual parallels like Git DAGs, Ethereum’s
+structure, and ideas for scalable implementations (e.g., rollups using
+max-sized Merkle trees). These were largely exploratory and architectural in
+nature.
 
 ---
-## Code-related prompts and outcomes:
+### Code-related prompts and outcomes:
 1. "As a Rust expert..."
 used to set context and generate an initial code structure.
 

@@ -14,6 +14,8 @@ use tower_http::cors::CorsLayer;
 mod merkle_tree;
 use merkle_tree::{IncrementalMerkleTree, MerkleProof};
 
+mod patricia_merkle;
+
 #[derive(Clone)]
 struct AppState {
     tree: Arc<RwLock<IncrementalMerkleTree>>,

@@ -15,6 +15,7 @@ mod merkle_tree;
 use merkle_tree::{IncrementalMerkleTree, MerkleProof};
 
 mod patricia_merkle;
+mod verkle_tree;
 
 #[derive(Clone)]
 struct AppState {

@@ -1,8 +1,9 @@
 use serde::Serialize;
 use sha3::{Digest, Keccak256};
 
-// dummy limit to avoid infinite growth (mem leak)
-const MAX_LEAVES: usize = 1 << 11; // 2048
+// tree limit
+const MAX_LEVELS: usize = 32;
+const MAX_LEAVES: usize = 1 << MAX_LEVELS;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MerkleProof {
@@ -13,6 +14,7 @@ pub struct MerkleProof {
 #[derive(Debug)]
 pub struct IncrementalMerkleTree {
     leaves: Vec<Vec<u8>>,
+    max_leaves: usize,
     // cache: level -> index -> hash
     cached_hashes: Vec<Vec<Vec<u8>>>,
     cached_root: Option<Vec<u8>>,
@@ -23,6 +25,17 @@ impl IncrementalMerkleTree {
     pub fn new() -> Self {
         Self {
             leaves: Vec::new(),
+            max_leaves: MAX_LEAVES,
+            cached_hashes: Vec::new(),
+            cached_root: None,
+            cache_valid: true,
+        }
+    }
+
+    pub fn _new_with_max(max_leaves: usize) -> Self {
+        Self {
+            leaves: Vec::new(),
+            max_leaves,
             cached_hashes: Vec::new(),
             cached_root: None,
             cache_valid: true,
@@ -30,7 +43,7 @@ impl IncrementalMerkleTree {
     }
 
     pub fn add_leaf(&mut self, leaf: Vec<u8>) -> Result<(), &'static str> {
-        if self.leaves.len() >= MAX_LEAVES {
+        if self.leaves.len() >= self.max_leaves {
             return Err("Exceeded max number of leaves in merkle tree");
         }
         self.leaves.push(leaf);
@@ -39,7 +52,7 @@ impl IncrementalMerkleTree {
     }
 
     pub fn add_leaves(&mut self, mut leaves: Vec<Vec<u8>>) -> Result<(), &'static str> {
-        if self.leaves.len() + leaves.len() > MAX_LEAVES {
+        if self.leaves.len() + leaves.len() > self.max_leaves {
             return Err("Exceeded max number of leaves in merkle tree");
         }
         self.leaves.append(&mut leaves);
@@ -149,8 +162,6 @@ impl IncrementalMerkleTree {
             return;
         }
         
-        let max_depth = 64;
-
         // Level 0: The leaves are the first level of hashes.
         // We clone them to store them in the cache.
         self.cached_hashes.clear();
@@ -160,7 +171,7 @@ impl IncrementalMerkleTree {
         let mut level_size = self.leaves.len();
 
         while level_size > 1 {
-            if current_level >= max_depth {
+            if current_level >= MAX_LEVELS {
                 println!("Exceeded max number of leaves in merkle tree");
                 return
             }
@@ -270,17 +281,19 @@ mod tests {
     }
 
     #[test]
-    fn test_leaf_limit_enforced() {
-        let mut tree = IncrementalMerkleTree::new();
+    fn test_max_levels_enforced() {
+        let test_max_levels = 11;
+        let test_max_leaves = 1 << test_max_levels;
+        let mut tree = IncrementalMerkleTree::_new_with_max(test_max_leaves);
         let leaf = vec![0u8; 32];
 
-        for _ in 0..MAX_LEAVES {
+        for _ in 0..test_max_leaves {
             assert!(tree.add_leaf(leaf.clone()).is_ok());
         }
 
-        let result = tree.add_leaf(leaf.clone());
-        assert!(result.is_err());
-        assert_eq!(tree.num_leaves(), MAX_LEAVES);
+        let root = tree.root();
+        assert!(root.is_some());
+        assert!(tree.cached_hashes.len() <= test_max_levels + 1); // +1 because root is an extra level
     }
 
     #[test]

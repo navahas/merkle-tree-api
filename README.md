@@ -28,9 +28,18 @@ and HTTPS termination automatically. The API is publicly accessible at:
 ## Getting Started
 
 ### Tests
-To run all unit tests for the Merkle tree logic and proof verification.
+You can run unit tests for both Merkle tree implementations and proof verification.
 ```bash
-cargo test
+# Run all tests in the project
+cargo test 
+```
+Specific test modules
+```bash
+# Only tests from merkle_tree.rs
+cargo test merkle_tree::
+
+# Only tests from patricia_merkle.rs
+cargo test patricia_merkle::
 ```
 
 ### Run

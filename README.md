@@ -1,4 +1,4 @@
-# Merkle Tree API in Rust (Axum)
+# Merkle Tree API in Rust
 
 Merkle tree server written in Rust using `axum`, supporting incremental
 updates, proof generation, and verification.

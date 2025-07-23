@@ -23,9 +23,7 @@ and HTTPS termination automatically. The API is publicly accessible at:
 - [https://merkle-api.codecrypto.academy](https://merkle-api.codecrypto.academy)
 
 > [!NOTE]
-> Local benchmark results are served at the `/benchmarks` path. For convenience,
-requests to the root path (`/`) will redirect to `/benchmarks` when accessed
-via a browser.
+> Previous local benchmark results are served at the `/benchmarks` path. See [`criterion-docs` branch](https://github.com/navahas/merkle-tree-api/tree/criterion-docs) for details.
 
 ## Getting Started
 
@@ -110,15 +108,12 @@ curl -X POST $BASE_URL/get-proof \
 .
 ├── benches/                      # Criterion benchmarks (HTTP client tests)
 │   └── api_benchmark.rs          # Async benchmark tests using reqwest + Criterion
-├── criterion/                    # Criterion benchmarks generated through script to serve
 ├── Cargo.toml
 ├── Cargo.lock
 ├── Dockerfile
 ├── docs/
 │   └── AI_PROMPTS.md             # Some notes about AI-assisted development
 ├── README.md
-├── scripts/
-│   └── fix-benchmark-links.sh    # Updates Criterion's HTML links for web serving
 └── src/
     ├── main.rs                   # Axum API server
     └── merkle_tree.rs            # Merkle tree implementation

@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::hint::black_box;
 use reqwest::Client;
 use serde_json::json;
@@ -10,6 +10,11 @@ const LEAVES_FOR_ROOT: usize = 50;
 const LEAVES_FOR_PROOF: usize = 100;
 const BATCH_SIZE: &[usize] = &[10, 50, 100, 200];
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+
+// utility to generate random 64-byte hex leaves
+fn generate_leaves(n: usize) -> Vec<String> {
+    (0..n).map(|_| format!("{:064x}", random::<u64>())).collect()
+}
 
 // NOTE: Recreating a reqwest::Client for each request led to socket exhaustion,
 // producing cryptic errors like "Can't assign requested address" on macOS.
@@ -34,163 +39,137 @@ async fn setup_server() -> (String, Client) {
 fn custom_criterion() -> Criterion {
     Criterion::default()
         .sample_size(10)
-        .measurement_time(Duration::from_secs(2)) // Increased for stability
+        .measurement_time(Duration::from_secs(2))
+        .configure_from_args()
 }
 
-async fn add_leaf_request(client: &Client, base_url: &str, leaf: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let response = timeout(
-        REQUEST_TIMEOUT,
-        client
-            .post(&format!("{}/add-leaf", base_url))
-            .json(&json!({ "leaf": leaf }))
-            .send()
-    ).await??;
-
-    if !response.status().is_success() {
-        return Err(format!("Request failed with status: {}", response.status()).into());
-    }
+async fn add_leaf(client: &Client, base_url: &str, leaf: &str) -> Result<(), Box<dyn std::error::Error>> {
+    timeout(REQUEST_TIMEOUT, client.post(&format!("{}/add-leaf", base_url))
+        .json(&json!({ "leaf": leaf }))
+        .send()).await??;
     Ok(())
 }
 
-async fn add_leaves_request(client: &Client, base_url: &str, leaves: &[String]) -> Result<(), Box<dyn std::error::Error>> {
-    let response = timeout(
-        REQUEST_TIMEOUT,
-        client
-            .post(&format!("{}/add-leaves", base_url))
-            .json(&json!({ "leaves": leaves }))
-            .send()
-    ).await??;
-
-    if !response.status().is_success() {
-        return Err(format!("Request failed with status: {}", response.status()).into());
-    }
+async fn add_leaves(client: &Client, base_url: &str, leaves: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    timeout(REQUEST_TIMEOUT, client.post(&format!("{}/add-leaves", base_url))
+        .json(&json!({ "leaves": leaves }))
+        .send()).await??;
     Ok(())
 }
 
-async fn get_root_request(client: &Client, base_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let response = timeout(
-        REQUEST_TIMEOUT,
-        client
-            .get(&format!("{}/get-root", base_url))
-            .send()
-    ).await??;
-
-    if !response.status().is_success() {
-        return Err(format!("Request failed with status: {}", response.status()).into());
-    }
+async fn get_root(client: &Client, base_url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    timeout(REQUEST_TIMEOUT, client.get(&format!("{}/get-root", base_url)).send()).await??;
     Ok(())
 }
 
-async fn get_proof_request(client: &Client, base_url: &str, index: usize) -> Result<(), Box<dyn std::error::Error>> {
-    let response = timeout(
-        REQUEST_TIMEOUT,
-        client
-            .post(&format!("{}/get-proof", base_url))
-            .json(&json!({ "index": index }))
-            .send()
-    ).await??;
-
-    if !response.status().is_success() {
-        return Err(format!("Request failed with status: {}", response.status()).into());
-    }
+async fn get_proof(client: &Client, base_url: &str, index: usize) -> Result<(), Box<dyn std::error::Error>> {
+    timeout(REQUEST_TIMEOUT, client.post(&format!("{}/get-proof", base_url))
+        .json(&json!({ "index": index }))
+        .send()).await??;
     Ok(())
 }
 
-fn benchmark_add_leaf(c: &mut Criterion) {
+/// Benchmark: POST /add-leaf
+fn bench_add_leaf(c: &mut Criterion) {
     let runtime = setup_runtime();
     let (base_url, client) = runtime.block_on(setup_server());
+    let mut group = c.benchmark_group("API: POST /add-leaf");
 
-    c.bench_function("add_leaf", |b| {
+    group.bench_function("add_leaf_single", |b| {
         b.iter(|| async {
             let leaf = format!("{:064x}", black_box(random::<u64>()));
-            if let Err(e) = add_leaf_request(&client, &base_url, &leaf).await {
-                eprintln!("add_leaf request failed: {}", e);
-            }
+            let _ = add_leaf(&client, &base_url, &leaf).await;
         });
     });
+
+    group.finish();
 }
 
-fn benchmark_add_leaves_batch(c: &mut Criterion) {
+/// Benchmark: POST /add-leaves with varying batch sizes
+fn bench_add_leaves_batch(c: &mut Criterion) {
     let runtime = setup_runtime();
     let (base_url, client) = runtime.block_on(setup_server());
+    let mut group = c.benchmark_group("API: POST /add-leaves");
 
     for &batch_size in BATCH_SIZE {
-        c.bench_with_input(
+        group.throughput(Throughput::Elements(batch_size as u64));
+        group.bench_with_input(
             BenchmarkId::new("add_leaves_batch", batch_size),
             &batch_size,
-            |b, &batch_size| {
+            |b, &size| {
                 b.iter(|| async {
-                    let leaves: Vec<String> = (0..batch_size)
-                        .map(|_| format!("{:064x}", random::<u64>()))
-                        .collect();
-                    if let Err(e) = add_leaves_request(&client, &base_url, &leaves).await {
-                        eprintln!("add_leaves request failed: {}", e);
-                    }
+                    let leaves = generate_leaves(size);
+                    let _ = add_leaves(&client, &base_url, black_box(&leaves)).await;
                 });
             },
         );
     }
+
+    group.finish();
 }
 
-fn benchmark_get_root(c: &mut Criterion) {
+/// Benchmark: GET /get-root (after fixed-size tree setup)
+fn bench_get_root(c: &mut Criterion) {
     let runtime = setup_runtime();
     let (base_url, client) = runtime.block_on(setup_server());
 
+    // Preload leaves once before the benchmark
     runtime.block_on(async {
-        let leaves: Vec<String> = (0..LEAVES_FOR_ROOT)
-            .map(|_| format!("{:064x}", random::<u64>()))
-            .collect();
-        if let Err(e) = add_leaves_request(&client, &base_url, &leaves).await {
-            eprintln!("Setup failed for get_root benchmark: {}", e);
-        }
+        let _ = add_leaves(&client, &base_url, &generate_leaves(LEAVES_FOR_ROOT)).await;
     });
 
-    c.bench_function("get_root", |b| {
+    let mut group = c.benchmark_group("API: GET /get-root");
+
+    group.bench_function("get_root_fixed_tree", |b| {
         b.iter(|| {
             runtime.block_on(async {
-                let _ =get_root_request(&client, &base_url).await;
+                let _ = get_root(&client, &base_url).await;
             })
         });
     });
+
+    group.finish();
 }
 
-fn benchmark_get_proof(c: &mut Criterion) {
+/// Benchmark: POST /get-proof (tree sizes: 10 to 200)
+fn bench_get_proof(c: &mut Criterion) {
     let runtime = setup_runtime();
     let (base_url, client) = runtime.block_on(setup_server());
 
+    // Setup a large enough tree once for all proof sizes
     runtime.block_on(async {
-        let leaves: Vec<String> = (0..LEAVES_FOR_PROOF)
-            .map(|_| format!("{:064x}", random::<u64>()))
-            .collect();
-        if let Err(e) = add_leaves_request(&client, &base_url, &leaves).await {
-            eprintln!("Setup failed for get_proof benchmark: {}", e);
-        }
+        let _ = add_leaves(&client, &base_url, &generate_leaves(LEAVES_FOR_PROOF)).await;
     });
 
+    let mut group = c.benchmark_group("API: POST /get-proof");
+
     for &tree_size in BATCH_SIZE {
-        c.bench_with_input(
-            BenchmarkId::new("get_proof", tree_size),
+        group.throughput(Throughput::Elements(1));
+        group.bench_with_input(
+            BenchmarkId::new("get_proof_at", tree_size),
             &tree_size,
-            |b, &tree_size| {
+            |b, &size| {
                 b.iter(|| {
                     runtime.block_on(async {
                         let mut rng = rand::rng();
-                        let index = black_box(rng.random_range(0..tree_size));
-                        let _ = get_proof_request(&client, &base_url, index).await;
+                        let index = black_box(rng.random_range(0..size));
+                        let _ = get_proof(&client, &base_url, index).await;
                     })
                 });
             },
         );
     }
+
+    group.finish();
 }
 
 criterion_group!(
     name = benches;
     config = custom_criterion();
-    targets = 
-        benchmark_add_leaf,
-        benchmark_add_leaves_batch,
-        benchmark_get_root,
-        benchmark_get_proof
+    targets =
+        bench_add_leaf,
+        bench_add_leaves_batch,
+        bench_get_root,
+        bench_get_proof
 );
 criterion_main!(benches);

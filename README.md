@@ -145,10 +145,11 @@ cargo bench --bench plot_benchmark
 - By contrast, get_proof always runs with logarithmic complexity (O(log n)), regardless of the tree size or updates.
 
 > [!NOTE]
-> O() (Big O notation) describes how the time or space required by an operation grows as the input size increases:
-> •	O(1) → constant time (fast and does not depend on input size)
-> •	O(n) → time grows linearly with the number of leaves
-> •	O(log n) → time grows slowly as the number of leaves increases (like doubling the tree size only adds one extra step)
+> O() (Big O notation) describes how performance scales with input size:
+> 
+> - O(1) → constant time (fast and does not depend on input size)
+> - O(n) → time grows linearly with the number of leaves
+> - O(log n) → time grows slowly as the number of leaves increases (like doubling the tree size only adds one extra step)
 
 
 Future benchmarks should explore how get_root scales at various tree sizes

@@ -22,8 +22,10 @@ RUN apt-get update && apt-get install -y \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the compiled binary from the build stage
 COPY --from=build /app/target/release/merkle-tree-api ./
+
+COPY target/criterion/ ./target/criterion/
+# COPY --from=build /app/target/criterion/report ./public/benchmarks
 
 # Define port and entrypoint
 ENV PORT=8080

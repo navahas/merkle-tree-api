@@ -1,10 +1,11 @@
 use axum::{
     extract::State,
     http::StatusCode,
-    response::Json,
-    routing::{get, post},
+    response::{IntoResponse, Json},
+    routing::{get, get_service, post},
     Router,
 };
+use tower_http::services::ServeDir;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -160,6 +161,13 @@ async fn get_proof(
     }
 }
 
+async fn redirect_to_benchmarks() -> impl IntoResponse {
+    (
+        StatusCode::FOUND,
+        [("Location", "/benchmarks/")],
+    )
+}
+
 #[tokio::main]
 async fn main() {
     let state = AppState {
@@ -172,6 +180,8 @@ async fn main() {
         .route("/get-num-leaves", get(get_num_leaves))
         .route("/get-root", get(get_root))
         .route("/get-proof", post(get_proof))
+        .route("/", get(redirect_to_benchmarks)) // <--- redirect root for criterion
+        .nest_service("/benchmarks", get_service(ServeDir::new("target/criterion/benchmarks")))
         .layer(CorsLayer::permissive())
         .with_state(state);
 

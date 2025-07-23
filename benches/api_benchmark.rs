@@ -8,7 +8,7 @@ use tokio::time::timeout;
 
 const LEAVES_FOR_ROOT: usize = 50;
 const LEAVES_FOR_PROOF: usize = 100;
-const BATCH_SIZE: &[usize] = &[10, 50, 100];
+const BATCH_SIZE: &[usize] = &[10, 50, 100, 200];
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 // NOTE: Recreating a reqwest::Client for each request led to socket exhaustion,

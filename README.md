@@ -121,7 +121,45 @@ curl -X POST $BASE_URL/get-proof \
 
 ## Benchmarking
 
-This project includes Criterion-based benchmarks.
+This project includes Criterion-based benchmarks. Sample of last benchmark test:
+
+```bash
+add_leaf                time:   [329.26 ps 330.81 ps 332.98 ps]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+
+add_leaves_batch/10     time:   [569.49 ps 596.59 ps 631.68 ps]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+
+add_leaves_batch/50     time:   [553.73 ps 553.96 ps 554.20 ps]
+
+add_leaves_batch/100    time:   [553.11 ps 553.39 ps 553.81 ps]
+
+add_leaves_batch/200    time:   [554.14 ps 554.98 ps 556.02 ps]
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low severe
+  1 (10.00%) high severe
+
+get_root                time:   [66.743 µs 67.163 µs 67.501 µs]
+
+get_proof/10            time:   [105.85 µs 106.89 µs 108.45 µs]
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low mild
+  1 (10.00%) high severe
+
+get_proof/50            time:   [104.06 µs 104.28 µs 104.50 µs]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low mild
+
+get_proof/100           time:   [104.34 µs 106.07 µs 107.06 µs]
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high mild
+
+get_proof/200           time:   [99.661 µs 100.34 µs 101.10 µs]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+```
 
 Run with:
 ```bash

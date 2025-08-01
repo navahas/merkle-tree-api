@@ -14,9 +14,6 @@ use tower_http::cors::CorsLayer;
 mod merkle_tree;
 use merkle_tree::{IncrementalMerkleTree, MerkleProof};
 
-mod patricia_merkle;
-mod verkle_tree;
-
 #[derive(Clone)]
 struct AppState {
     tree: Arc<RwLock<IncrementalMerkleTree>>,
@@ -149,7 +146,7 @@ async fn get_proof(
     Json(payload): Json<GetProofRequest>,
 ) -> Result<Json<ProofResponse>, (StatusCode, Json<ErrorResponse>)> {
     let maybe_proof = {
-        let mut tree = state.tree.write().await;
+        let tree = state.tree.write().await;
         tree.get_proof(payload.index)
     };
 
@@ -164,13 +161,6 @@ async fn get_proof(
     }
 }
 
-async fn redirect_to_benchmarks() -> impl IntoResponse {
-    (
-        StatusCode::FOUND,
-        [("Location", "/benchmarks/")],
-    )
-}
-
 #[tokio::main]
 async fn main() {
     let state = AppState {
@@ -183,8 +173,6 @@ async fn main() {
         .route("/get-num-leaves", get(get_num_leaves))
         .route("/get-root", get(get_root))
         .route("/get-proof", post(get_proof))
-        .route("/", get(redirect_to_benchmarks)) // <--- redirect root for criterion
-        .nest_service("/benchmarks", get_service(ServeDir::new("criterion")))
         .layer(CorsLayer::permissive())
         .with_state(state);
 

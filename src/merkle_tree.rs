@@ -8,6 +8,7 @@ const MAX_LEAVES: usize = 1 << MAX_LEVELS;
 #[derive(Debug, Clone, Serialize)]
 pub struct MerkleProof {
     pub siblings: Vec<String>,
+    // not strictly needed
     pub directions: Vec<bool>, // true = right, false = left
 }
 
@@ -47,7 +48,7 @@ impl IncrementalMerkleTree {
             return Err("Exceeded max number of leaves in merkle tree");
         }
         self.leaves.push(leaf);
-        self.invalidate_cache();
+        self.compute_tree();
         Ok(())
     }
 
@@ -56,7 +57,11 @@ impl IncrementalMerkleTree {
             return Err("Exceeded max number of leaves in merkle tree");
         }
         self.leaves.append(&mut leaves);
+        // possible inconsistency, appending while getting root.
+        // add leaves -> from client A
+        // get root -> from client B
         self.invalidate_cache();
+        self.compute_tree();
         Ok(())
     }
 
@@ -77,20 +82,21 @@ impl IncrementalMerkleTree {
         self.cached_root.clone()
     }
 
-    pub fn get_proof(&mut self, index: usize) -> Option<MerkleProof> {
+    pub fn get_proof(&self, index: usize) -> Option<MerkleProof> {
         if index >= self.leaves.len() {
             return None;
         }
 
-        if !self.cache_valid {
-            self.compute_tree();
-        }
-
+        //if !self.cache_valid {
+        //    self.compute_tree();
+        //}
+        
         let mut siblings = Vec::new();
         let mut directions = Vec::new();
         let mut current_index = index;
         let mut current_level = 0;
 
+        // loop unnecesary, modify to for to prevent infinite loop
         loop {
             let level_hashes = self.cached_hashes.get(current_level)?;
             let level_size = if current_level == 0 {

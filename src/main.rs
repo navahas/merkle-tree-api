@@ -1,11 +1,10 @@
 use axum::{
     extract::State,
     http::StatusCode,
-    response::{IntoResponse, Json},
-    routing::{get, get_service, post},
+    response::Json,
+    routing::{get, post},
     Router,
 };
-use tower_http::services::ServeDir;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;

@@ -1,9 +1,9 @@
 use axum::{
+    Router,
     extract::State,
     http::StatusCode,
     response::Json,
     routing::{get, post},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -83,7 +83,8 @@ async fn add_leaves(
     State(state): State<AppState>,
     Json(payload): Json<AddLeavesRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
-    let leaves_bytes: Result<Vec<_>, _> = payload.leaves
+    let leaves_bytes: Result<Vec<_>, _> = payload
+        .leaves
         .iter()
         .map(|leaf_hex| {
             hex::decode(leaf_hex).map_err(|_| {
@@ -112,9 +113,7 @@ async fn add_leaves(
     Ok(StatusCode::OK)
 }
 
-async fn get_num_leaves(
-    State(state): State<AppState>,
-) -> Json<NumLeavesResponse> {
+async fn get_num_leaves(State(state): State<AppState>) -> Json<NumLeavesResponse> {
     let tree = state.tree.read().await;
     Json(NumLeavesResponse {
         num_leaves: tree.num_leaves(),

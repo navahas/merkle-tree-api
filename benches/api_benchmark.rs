@@ -1,8 +1,8 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::hint::black_box;
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use rand::{Rng, random};
 use reqwest::Client;
 use serde_json::json;
-use rand::{random, Rng};
+use std::hint::black_box;
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -13,7 +13,9 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 // utility to generate random 64-byte hex leaves
 fn generate_leaves(n: usize) -> Vec<String> {
-    (0..n).map(|_| format!("{:064x}", random::<u64>())).collect()
+    (0..n)
+        .map(|_| format!("{:064x}", random::<u64>()))
+        .collect()
 }
 
 // NOTE: Recreating a reqwest::Client for each request led to socket exhaustion,
@@ -43,29 +45,60 @@ fn custom_criterion() -> Criterion {
         .configure_from_args()
 }
 
-async fn add_leaf(client: &Client, base_url: &str, leaf: &str) -> Result<(), Box<dyn std::error::Error>> {
-    timeout(REQUEST_TIMEOUT, client.post(&format!("{}/add-leaf", base_url))
-        .json(&json!({ "leaf": leaf }))
-        .send()).await??;
+async fn add_leaf(
+    client: &Client,
+    base_url: &str,
+    leaf: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    timeout(
+        REQUEST_TIMEOUT,
+        client
+            .post(&format!("{}/add-leaf", base_url))
+            .json(&json!({ "leaf": leaf }))
+            .send(),
+    )
+    .await??;
     Ok(())
 }
 
-async fn add_leaves(client: &Client, base_url: &str, leaves: &[String]) -> Result<(), Box<dyn std::error::Error>> {
-    timeout(REQUEST_TIMEOUT, client.post(&format!("{}/add-leaves", base_url))
-        .json(&json!({ "leaves": leaves }))
-        .send()).await??;
+async fn add_leaves(
+    client: &Client,
+    base_url: &str,
+    leaves: &[String],
+) -> Result<(), Box<dyn std::error::Error>> {
+    timeout(
+        REQUEST_TIMEOUT,
+        client
+            .post(&format!("{}/add-leaves", base_url))
+            .json(&json!({ "leaves": leaves }))
+            .send(),
+    )
+    .await??;
     Ok(())
 }
 
 async fn get_root(client: &Client, base_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-    timeout(REQUEST_TIMEOUT, client.get(&format!("{}/get-root", base_url)).send()).await??;
+    timeout(
+        REQUEST_TIMEOUT,
+        client.get(&format!("{}/get-root", base_url)).send(),
+    )
+    .await??;
     Ok(())
 }
 
-async fn get_proof(client: &Client, base_url: &str, index: usize) -> Result<(), Box<dyn std::error::Error>> {
-    timeout(REQUEST_TIMEOUT, client.post(&format!("{}/get-proof", base_url))
-        .json(&json!({ "index": index }))
-        .send()).await??;
+async fn get_proof(
+    client: &Client,
+    base_url: &str,
+    index: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
+    timeout(
+        REQUEST_TIMEOUT,
+        client
+            .post(&format!("{}/get-proof", base_url))
+            .json(&json!({ "index": index }))
+            .send(),
+    )
+    .await??;
     Ok(())
 }
 

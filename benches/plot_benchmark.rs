@@ -1,8 +1,8 @@
-use criterion::{criterion_group, criterion_main, Criterion};
-use std::hint::black_box;
+use criterion::{Criterion, criterion_group, criterion_main};
+use rand::{Rng, random};
 use reqwest::Client;
 use serde_json::json;
-use rand::{random, Rng};
+use std::hint::black_box;
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -25,14 +25,19 @@ async fn setup_server() -> (String, Client) {
     ("http://127.0.0.1:8080".to_string(), client)
 }
 
-async fn add_leaf_single(client: &Client, base_url: &str, leaf: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn add_leaf_single(
+    client: &Client,
+    base_url: &str,
+    leaf: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let response = timeout(
         REQUEST_TIMEOUT,
         client
             .post(&format!("{}/add-leaf", base_url))
             .json(&json!({ "leaf": leaf }))
-            .send()
-    ).await??;
+            .send(),
+    )
+    .await??;
 
     if !response.status().is_success() {
         return Err(format!("Request failed with status: {}", response.status()).into());
@@ -40,14 +45,19 @@ async fn add_leaf_single(client: &Client, base_url: &str, leaf: &str) -> Result<
     Ok(())
 }
 
-async fn add_leaves_batch(client: &Client, base_url: &str, leaves: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+async fn add_leaves_batch(
+    client: &Client,
+    base_url: &str,
+    leaves: &[String],
+) -> Result<(), Box<dyn std::error::Error>> {
     let response = timeout(
         REQUEST_TIMEOUT,
         client
             .post(&format!("{}/add-leaves", base_url))
             .json(&json!({ "leaves": leaves }))
-            .send()
-    ).await??;
+            .send(),
+    )
+    .await??;
 
     if !response.status().is_success() {
         return Err(format!("Request failed with status: {}", response.status()).into());
@@ -58,8 +68,9 @@ async fn add_leaves_batch(client: &Client, base_url: &str, leaves: &[String]) ->
 async fn get_root(client: &Client, base_url: &str) -> Result<(), Box<dyn std::error::Error>> {
     let response = timeout(
         REQUEST_TIMEOUT,
-        client.get(&format!("{}/get-root", base_url)).send()
-    ).await??;
+        client.get(&format!("{}/get-root", base_url)).send(),
+    )
+    .await??;
 
     if !response.status().is_success() {
         return Err(format!("Request failed with status: {}", response.status()).into());
@@ -67,14 +78,19 @@ async fn get_root(client: &Client, base_url: &str) -> Result<(), Box<dyn std::er
     Ok(())
 }
 
-async fn get_proof(client: &Client, base_url: &str, index: usize) -> Result<(), Box<dyn std::error::Error>> {
+async fn get_proof(
+    client: &Client,
+    base_url: &str,
+    index: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
     let response = timeout(
         REQUEST_TIMEOUT,
         client
             .post(&format!("{}/get-proof", base_url))
             .json(&json!({ "index": index }))
-            .send()
-    ).await??;
+            .send(),
+    )
+    .await??;
 
     if !response.status().is_success() {
         return Err(format!("Request failed with status: {}", response.status()).into());
@@ -85,7 +101,7 @@ async fn get_proof(client: &Client, base_url: &str, index: usize) -> Result<(), 
 fn bench_merkle_operations(c: &mut Criterion) {
     let runtime = setup_runtime();
     let (base_url, client) = runtime.block_on(setup_server());
-    
+
     // Pre-populate tree for root/proof operations
     runtime.block_on(async {
         let leaves: Vec<String> = (0..TEST_LEAVES)
@@ -95,7 +111,7 @@ fn bench_merkle_operations(c: &mut Criterion) {
     });
 
     let mut group = c.benchmark_group("Merkle Tree Operations");
-    
+
     // Single leaf addition
     group.bench_function("add single leaf", |b| {
         b.iter(|| async {
@@ -148,7 +164,7 @@ fn bench_batch_sizes(c: &mut Criterion) {
     let (base_url, client) = runtime.block_on(setup_server());
 
     let mut group = c.benchmark_group("Batch Size Comparison");
-    
+
     for &size in &[1, 5, 10, 25, 50, 100] {
         group.bench_function(&format!("batch size {}", size), |b| {
             b.iter(|| async {
@@ -168,7 +184,7 @@ fn bench_single_vs_batch(c: &mut Criterion) {
     let (base_url, client) = runtime.block_on(setup_server());
 
     let mut group = c.benchmark_group("Single vs Batch");
-    
+
     // 10 single operations
     group.bench_function("10 single operations", |b| {
         b.iter(|| async {
@@ -193,7 +209,7 @@ fn bench_single_vs_batch(c: &mut Criterion) {
 }
 
 criterion_group!(
-    benches, 
+    benches,
     bench_merkle_operations,
     bench_batch_sizes,
     bench_single_vs_batch

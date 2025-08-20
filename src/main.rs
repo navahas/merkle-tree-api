@@ -11,6 +11,7 @@ use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 
 mod merkle_tree;
+mod storage;
 use merkle_tree::{IncrementalMerkleTree, MerkleProof};
 
 #[derive(Clone)]
@@ -161,8 +162,21 @@ async fn get_proof(
 
 #[tokio::main]
 async fn main() {
+    let storage_path = std::env::var("STORAGE_PATH").unwrap_or_else(|_| "./merkle_tree.db".to_string());
+    
+    let tree = match IncrementalMerkleTree::new_with_storage(&storage_path) {
+        Ok(tree) => {
+            println!("Loaded existing merkle tree from: {}", storage_path);
+            tree
+        }
+        Err(e) => {
+            println!("Failed to load from storage ({}), creating new tree: {}", storage_path, e);
+            IncrementalMerkleTree::new()
+        }
+    };
+
     let state = AppState {
-        tree: Arc::new(RwLock::new(IncrementalMerkleTree::new())),
+        tree: Arc::new(RwLock::new(tree)),
     };
 
     let app = Router::new()
@@ -179,6 +193,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
 
     println!("Server running on http://{}", addr);
+    println!("Storage path: {}", storage_path);
 
     axum::serve(listener, app).await.unwrap();
 }

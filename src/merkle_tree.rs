@@ -1,5 +1,6 @@
 use serde::Serialize;
 use sha3::{Digest, Keccak256};
+use super::storage::{LmdbStorage, TreeMetadata};
 
 // tree limit
 const MAX_LEVELS: usize = 32;
@@ -18,6 +19,7 @@ pub struct IncrementalMerkleTree {
     pub cached_hashes: Vec<Vec<Vec<u8>>>,
     cached_root: Option<Vec<u8>>,
     cache_valid: bool,
+    storage: Option<LmdbStorage>,
 }
 
 impl IncrementalMerkleTree {
@@ -28,7 +30,22 @@ impl IncrementalMerkleTree {
             cached_hashes: Vec::new(),
             cached_root: None,
             cache_valid: true,
+            storage: None,
         }
+    }
+
+    pub fn new_with_storage(storage_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let storage = LmdbStorage::new(storage_path)?;
+        let mut tree = Self {
+            leaves: Vec::new(),
+            max_leaves: MAX_LEAVES,
+            cached_hashes: Vec::new(),
+            cached_root: None,
+            cache_valid: true,
+            storage: Some(storage),
+        };
+        tree.load_from_storage()?;
+        Ok(tree)
     }
 
     pub fn _new_with_max(max_leaves: usize) -> Self {
@@ -38,6 +55,7 @@ impl IncrementalMerkleTree {
             cached_hashes: Vec::new(),
             cached_root: None,
             cache_valid: true,
+            storage: None,
         }
     }
 
@@ -45,8 +63,14 @@ impl IncrementalMerkleTree {
         if self.leaves.len() >= self.max_leaves {
             return Err("Exceeded max number of leaves in merkle tree");
         }
-        self.leaves.push(leaf);
+        self.leaves.push(leaf.clone());
         self.compute_tree();
+        
+        if let Some(ref storage) = self.storage {
+            let _ = storage.store_leaf(self.leaves.len() - 1, &leaf);
+            self.save_to_storage();
+        }
+        
         Ok(())
     }
 
@@ -54,12 +78,16 @@ impl IncrementalMerkleTree {
         if self.leaves.len() + leaves.len() > self.max_leaves {
             return Err("Exceeded max number of leaves in merkle tree");
         }
+        let start_index = self.leaves.len();
         self.leaves.append(&mut leaves);
-        // possible inconsistency, appending while getting root. How to test?
-        // add leaves -> from client A
-        // get root -> from client B
-        self.invalidate_cache();
         self.compute_tree();
+        
+        if let Some(ref storage) = self.storage {
+            let leaves_to_store = &self.leaves[start_index..];
+            let _ = storage.append_leaves(start_index, leaves_to_store);
+            self.save_to_storage();
+        }
+        
         Ok(())
     }
 
@@ -85,7 +113,7 @@ impl IncrementalMerkleTree {
             return None;
         }
 
-        if !self.cache_valid {
+        if self.cached_hashes.is_empty() {
             return None;
         }
 
@@ -129,7 +157,7 @@ impl IncrementalMerkleTree {
         Some(MerkleProof { siblings })
     }
 
-    pub fn _verify_proof(
+    pub fn verify_proof(
         &self,
         leaf: &[u8],
         proof: &MerkleProof,
@@ -161,6 +189,9 @@ impl IncrementalMerkleTree {
 
     fn compute_tree(&mut self) {
         if self.leaves.is_empty() {
+            self.cached_hashes.clear();
+            self.cached_root = None;
+            self.cache_valid = true;
             return;
         }
 
@@ -206,17 +237,65 @@ impl IncrementalMerkleTree {
         self.cache_valid = true;
     }
 
+    fn load_from_storage(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(ref storage) = self.storage {
+            if let Some(metadata) = storage.get_metadata()? {
+                self.max_leaves = metadata.max_leaves;
+                self.cache_valid = metadata.cache_valid;
+            }
+            
+            self.leaves = storage.get_all_leaves()?;
+            self.cached_hashes = storage.get_all_cache_levels()?;
+            self.cached_root = storage.get_root()?;
+        }
+        Ok(())
+    }
+
+    fn save_to_storage(&self) {
+        if let Some(ref storage) = self.storage {
+            let metadata = TreeMetadata {
+                num_leaves: self.leaves.len(),
+                max_leaves: self.max_leaves,
+                cache_valid: self.cache_valid,
+            };
+            
+            let _ = storage.store_metadata(&metadata);
+            let _ = storage.store_cache_batch(&self.cached_hashes);
+            
+            if let Some(ref root) = self.cached_root {
+                let _ = storage.store_root(root);
+            }
+            
+            let _ = storage.sync();
+        }
+    }
+
+    pub fn persist(&self) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(ref storage) = self.storage {
+            let metadata = TreeMetadata {
+                num_leaves: self.leaves.len(),
+                max_leaves: self.max_leaves,
+                cache_valid: self.cache_valid,
+            };
+            
+            storage.store_leaves_batch(&self.leaves)?;
+            storage.store_metadata(&metadata)?;
+            storage.store_cache_batch(&self.cached_hashes)?;
+            
+            if let Some(ref root) = self.cached_root {
+                storage.store_root(root)?;
+            }
+            
+            storage.sync()?;
+        }
+        Ok(())
+    }
+
     fn hash_pair(&self, left: &[u8], right: &[u8]) -> Vec<u8> {
         let mut hasher = Keccak256::new();
         hasher.update(left);
         hasher.update(right);
         hasher.finalize().to_vec()
-    }
-
-    fn invalidate_cache(&mut self) {
-        self.cache_valid = false;
-        self.cached_root = None;
-        self.cached_hashes.clear();
     }
 }
 

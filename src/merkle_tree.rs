@@ -1,6 +1,6 @@
+use super::storage::{LmdbStorage, TreeMetadata};
 use serde::Serialize;
 use sha3::{Digest, Keccak256};
-use super::storage::{LmdbStorage, TreeMetadata};
 
 // tree limit
 const MAX_LEVELS: usize = 32;
@@ -65,12 +65,12 @@ impl IncrementalMerkleTree {
         }
         self.leaves.push(leaf.clone());
         self.compute_tree();
-        
+
         if let Some(ref storage) = self.storage {
             let _ = storage.store_leaf(self.leaves.len() - 1, &leaf);
             self.save_to_storage();
         }
-        
+
         Ok(())
     }
 
@@ -81,13 +81,13 @@ impl IncrementalMerkleTree {
         let start_index = self.leaves.len();
         self.leaves.append(&mut leaves);
         self.compute_tree();
-        
+
         if let Some(ref storage) = self.storage {
             let leaves_to_store = &self.leaves[start_index..];
             let _ = storage.append_leaves(start_index, leaves_to_store);
             self.save_to_storage();
         }
-        
+
         Ok(())
     }
 
@@ -243,7 +243,7 @@ impl IncrementalMerkleTree {
                 self.max_leaves = metadata.max_leaves;
                 self.cache_valid = metadata.cache_valid;
             }
-            
+
             self.leaves = storage.get_all_leaves()?;
             self.cached_hashes = storage.get_all_cache_levels()?;
             self.cached_root = storage.get_root()?;
@@ -258,14 +258,14 @@ impl IncrementalMerkleTree {
                 max_leaves: self.max_leaves,
                 cache_valid: self.cache_valid,
             };
-            
+
             let _ = storage.store_metadata(&metadata);
             let _ = storage.store_cache_batch(&self.cached_hashes);
-            
+
             if let Some(ref root) = self.cached_root {
                 let _ = storage.store_root(root);
             }
-            
+
             let _ = storage.sync();
         }
     }
@@ -277,15 +277,15 @@ impl IncrementalMerkleTree {
                 max_leaves: self.max_leaves,
                 cache_valid: self.cache_valid,
             };
-            
+
             storage.store_leaves_batch(&self.leaves)?;
             storage.store_metadata(&metadata)?;
             storage.store_cache_batch(&self.cached_hashes)?;
-            
+
             if let Some(ref root) = self.cached_root {
                 storage.store_root(root)?;
             }
-            
+
             storage.sync()?;
         }
         Ok(())

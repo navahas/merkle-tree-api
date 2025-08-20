@@ -112,7 +112,7 @@ fn test_proof_verification_valid() {
     let root = tree.root().unwrap();
     let proof = tree.get_proof(1).unwrap();
 
-    assert!(tree._verify_proof(&leaves[1], &proof, &root, 1));
+    assert!(tree.verify_proof(&leaves[1], &proof, &root, 1));
 }
 
 #[test]
@@ -125,7 +125,7 @@ fn test_proof_verification_invalid_leaf() {
     let proof = tree.get_proof(1).unwrap();
 
     // Wrong leaf data
-    assert!(!tree._verify_proof(&hex("wrong"), &proof, &root, 1));
+    assert!(!tree.verify_proof(&hex("wrong"), &proof, &root, 1));
 }
 
 #[test]
@@ -137,7 +137,7 @@ fn test_proof_verification_invalid_root() {
     let proof = tree.get_proof(1).unwrap();
     let wrong_root = hex("wrong_root");
 
-    assert!(!tree._verify_proof(&leaves[1], &proof, &wrong_root, 1));
+    assert!(!tree.verify_proof(&leaves[1], &proof, &wrong_root, 1));
 }
 
 #[test]
@@ -151,7 +151,7 @@ fn test_proof_verification_malformed_proof() {
         siblings: vec!["invalid_hex_string".to_string()],
     };
 
-    assert!(!tree._verify_proof(&leaf, &invalid_hex_proof, &root, 0));
+    assert!(!tree.verify_proof(&leaf, &invalid_hex_proof, &root, 0));
 }
 
 #[test]
@@ -163,5 +163,5 @@ fn test_proof_verification_single_leaf() {
     let root = tree.root().unwrap();
     let proof = tree.get_proof(0).unwrap();
 
-    assert!(tree._verify_proof(&leaf, &proof, &root, 0));
+    assert!(tree.verify_proof(&leaf, &proof, &root, 0));
 }

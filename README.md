@@ -1,14 +1,16 @@
 # Merkle Tree API in Rust
 
-Merkle tree server written in Rust using `axum`, supporting incremental
-updates, proof generation, and verification.
+High-performance Merkle tree server written in Rust using `axum`, featuring dual implementations (in-memory and persistent), thread-safe concurrent operations, and comprehensive ACID-compliant storage via LMDB.
 
 ## Features
 - Incremental Merkle Tree with SHA-3 Keccak256
+- Dual implementation: In-memory (heap) and persistent (LMDB)
 - Caching of tree levels for fast root/proof computation
 - REST API for adding leaves and querying proofs
-- Simple and readable implementation
+- Thread-safe concurrent operations with RwLock
+- Comprehensive test coverage including concurrency tests
 - Optional benchmarking and load testing via criterion and reqwest
+- LMDB-based persistence with ACID transactions
 
 ### AI Assistance
 
@@ -28,25 +30,40 @@ and HTTPS termination automatically. The API is publicly accessible at:
 ## Getting Started
 
 ### Tests
-You can run unit tests for the Merkle tree implementation and proof verification.
+Comprehensive test suite covering all components:
 ```bash
 # Run all tests in the project
 cargo test 
 
-# Only tests from merkle_tree.rs
+# Run specific test modules
 cargo test merkle_tree::
+cargo test storage::
+cargo test lmdb_tree::
+cargo test concurrency::
+
+# Run unit tests only
+cargo test test_unit
+
+# Run concurrency tests only
+cargo test test_concurrency
 ```
 
 ### Run
-Server starts on port `8080` by default. (override with PORT env var)
+Server starts on port `8080` by default with dual tree implementations:
 ```bash
-# export PORT=
+# Run with default settings
+cargo run
+
+# Configure port and LMDB storage path
+export PORT=3000
+export STORAGE_PATH=./custom_merkle.db
 cargo run
 ```
 
 ## API Endpoints
-This API exposes the following routes to interact with the Merkle tree:
+This API exposes dual implementations via different route prefixes:
 
+### Heap-based Routes (In-Memory)
 | Method | Route            | Description                         |
 |--------|------------------|-------------------------------------|
 | POST   | `/add-leaf`      | Adds a single leaf (hex string) to the tree |
@@ -54,6 +71,17 @@ This API exposes the following routes to interact with the Merkle tree:
 | GET    | `/get-num-leaves`| Returns the current number of leaves |
 | GET    | `/get-root`      | Returns the Merkle root (hex encoded) |
 | POST   | `/get-proof`     | Returns a Merkle proof for the given leaf index |
+
+### LMDB-based Routes (Persistent)
+| Method | Route                  | Description                         |
+|--------|------------------------|-------------------------------------|
+| POST   | `/lmdb/add-leaf`       | Adds a single leaf with persistence |
+| POST   | `/lmdb/add-leaves`     | Adds multiple leaves with persistence |
+| GET    | `/lmdb/get-num-leaves` | Returns leaves count from database |
+| GET    | `/lmdb/get-root`       | Returns root hash from database |
+| POST   | `/lmdb/get-proof`      | Returns proof generated from database |
+
+> **Note**: LMDB routes provide full persistence across server restarts, while heap routes reset on restart.
 
 You can test the API directly in the deployed resource, without running it
 locally. Set the BASE_URL environment variable accordingly:
@@ -71,7 +99,13 @@ export BASE_URL=http://localhost:8080
 echo -n "some data to hash" | openssl dgst -sha256
 # Output: (stdin)= 6a2da20943931e9834fc12cfe5bb47bbd9ae43489a30726962b576f4e3993e50
 
+# Add to heap-based tree
 curl -X POST $BASE_URL/add-leaf \
+  -H "Content-Type: application/json" \
+  -d '{"leaf": "6a2da20943931e9834fc12cfe5bb47bbd9ae43489a30726962b576f4e3993e50"}'
+
+# Add to persistent LMDB tree
+curl -X POST $BASE_URL/lmdb/add-leaf \
   -H "Content-Type: application/json" \
   -d '{"leaf": "6a2da20943931e9834fc12cfe5bb47bbd9ae43489a30726962b576f4e3993e50"}'
 ```
@@ -82,26 +116,46 @@ curl -X POST $BASE_URL/add-leaf \
 echo -n "new data" | openssl dgst -sha256
 echo -n "more data" | openssl dgst -sha256
 
+# Add to heap-based tree
 curl -X POST $BASE_URL/add-leaves \
   -H "Content-Type: application/json" \
   -d '{"leaves": ["737165b08ad9b72940af2167aae90fb7eb3b52faf641c0590d36f857adbe451d", "d5b7f828235a92d3d280fa08f3ddb9e5b6947123b44091c92db7594aa1408614"]}'
+
+# Add to persistent LMDB tree
+curl -X POST $BASE_URL/lmdb/add-leaves \
+  -H "Content-Type: application/json" \
+  -d '{"leaves": ["737165b08ad9b72940af2167aae90fb7eb3b52faf641c0590d36f857adbe451d", "d5b7f828235a92d3d280fa08f3ddb9e5b6947123b44091c92db7594aa1408614"]}'
 ```
-- Get Number of Leaves: `/get-num-leaves`
+- Get Number of Leaves:
 
 ```bash
+# From heap-based tree
 curl $BASE_URL/get-num-leaves
+
+# From persistent LMDB tree
+curl $BASE_URL/lmdb/get-num-leaves
 ```
 
-- Get Merkle Root: `/get-root`
+- Get Merkle Root:
 
 ```bash
+# From heap-based tree
 curl $BASE_URL/get-root
+
+# From persistent LMDB tree
+curl $BASE_URL/lmdb/get-root
 ```
 
-- Get Proof for a Leaf: `/get-proof`
+- Get Proof for a Leaf:
 
 ```bash
+# From heap-based tree
 curl -X POST $BASE_URL/get-proof \
+  -H "Content-Type: application/json" \
+  -d '{"index": 0}'
+
+# From persistent LMDB tree
+curl -X POST $BASE_URL/lmdb/get-proof \
   -H "Content-Type: application/json" \
   -d '{"index": 0}'
 ```
@@ -111,16 +165,26 @@ curl -X POST $BASE_URL/get-proof \
 ```bash
 .
 ├── benches/                      # Criterion benchmarks (HTTP client tests)
-│   └── api_benchmark.rs          # Async benchmark tests using reqwest + Criterion
+│   ├── api_benchmark.rs          # Async benchmark tests using reqwest + Criterion
+│   └── plot_benchmark.rs         # Feature analysis benchmarks
+├── tests/                        # Integration and unit tests
+│   ├── test_concurrency.rs       # Async concurrency tests
+│   ├── test_unit.rs              # Core unit tests
+│   ├── test_storage.rs           # LMDB storage tests
+│   └── test_lmdb_tree.rs         # LMDB tree implementation tests
 ├── Cargo.toml
 ├── Cargo.lock
 ├── Dockerfile
+├── k6-load-test.js               # K6 load testing script
 ├── docs/
 │   └── AI_PROMPTS.md             # Some notes about AI-assisted development
 ├── README.md
 └── src/
-    ├── main.rs                   # Axum API server
-    └── merkle_tree.rs            # Merkle tree implementation
+    ├── main.rs                   # Axum API server with dual implementations
+    ├── lib.rs                    # Library exports
+    ├── merkle_tree.rs            # In-memory Merkle tree implementation
+    ├── lmdb_tree.rs              # Persistent LMDB Merkle tree
+    └── storage.rs                # LMDB storage abstraction
 ```
 
 ## Benchmarking
@@ -137,6 +201,9 @@ Run with:
 ```bash
 cargo bench --bench api_benchmark
 cargo bench --bench plot_benchmark
+
+# Load testing with k6
+k6 run k6-load-test.js
 ```
 
 > [!IMPORTANT]  

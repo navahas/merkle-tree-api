@@ -1,4 +1,6 @@
-use lmdb::{Cursor, Database, DatabaseFlags, Environment, EnvironmentFlags, Transaction, WriteFlags};
+use lmdb::{
+    Cursor, Database, DatabaseFlags, Environment, EnvironmentFlags, Transaction, WriteFlags,
+};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -70,30 +72,38 @@ impl LmdbStorage {
 
     pub fn store_leaves_batch(&self, leaves: &[Vec<u8>]) -> Result<(), Box<dyn std::error::Error>> {
         let mut txn = self.env.begin_rw_txn()?;
-        
+
         for (index, leaf) in leaves.iter().enumerate() {
             let key = index.to_be_bytes();
             txn.put(self.leaves_db, &key, &leaf, WriteFlags::empty())?;
         }
-        
+
         txn.commit()?;
         Ok(())
     }
 
-    pub fn append_leaves(&self, start_index: usize, leaves: &[Vec<u8>]) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn append_leaves(
+        &self,
+        start_index: usize,
+        leaves: &[Vec<u8>],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut txn = self.env.begin_rw_txn()?;
-        
+
         for (offset, leaf) in leaves.iter().enumerate() {
             let key = (start_index + offset).to_be_bytes();
             txn.put(self.leaves_db, &key, &leaf, WriteFlags::empty())?;
         }
-        
+
         txn.commit()?;
         Ok(())
     }
 
     // Cache operations
-    pub fn store_cache_level(&self, level: usize, hashes: &[Vec<u8>]) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn store_cache_level(
+        &self,
+        level: usize,
+        hashes: &[Vec<u8>],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut txn = self.env.begin_rw_txn()?;
         let key = format!("level_{}", level);
         let serialized = bincode::serialize(hashes)?;
@@ -102,7 +112,10 @@ impl LmdbStorage {
         Ok(())
     }
 
-    pub fn get_cache_level(&self, level: usize) -> Result<Option<Vec<Vec<u8>>>, Box<dyn std::error::Error>> {
+    pub fn get_cache_level(
+        &self,
+        level: usize,
+    ) -> Result<Option<Vec<Vec<u8>>>, Box<dyn std::error::Error>> {
         let txn = self.env.begin_ro_txn()?;
         let key = format!("level_{}", level);
         match txn.get(self.cache_db, &key) {
@@ -128,15 +141,18 @@ impl LmdbStorage {
         Ok(levels)
     }
 
-    pub fn store_cache_batch(&self, cache_levels: &[Vec<Vec<u8>>]) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn store_cache_batch(
+        &self,
+        cache_levels: &[Vec<Vec<u8>>],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut txn = self.env.begin_rw_txn()?;
-        
+
         for (level, hashes) in cache_levels.iter().enumerate() {
             let key = format!("level_{}", level);
             let serialized = bincode::serialize(hashes)?;
             txn.put(self.cache_db, &key, &serialized, WriteFlags::empty())?;
         }
-        
+
         txn.commit()?;
         Ok(())
     }
@@ -149,10 +165,18 @@ impl LmdbStorage {
     }
 
     // Metadata operations
-    pub fn store_metadata(&self, metadata: &TreeMetadata) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn store_metadata(
+        &self,
+        metadata: &TreeMetadata,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut txn = self.env.begin_rw_txn()?;
         let serialized = bincode::serialize(metadata)?;
-        txn.put(self.metadata_db, &"tree_metadata", &serialized, WriteFlags::empty())?;
+        txn.put(
+            self.metadata_db,
+            &"tree_metadata",
+            &serialized,
+            WriteFlags::empty(),
+        )?;
         txn.commit()?;
         Ok(())
     }

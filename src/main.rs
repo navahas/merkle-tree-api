@@ -145,7 +145,7 @@ async fn get_proof(
     Json(payload): Json<GetProofRequest>,
 ) -> Result<Json<ProofResponse>, (StatusCode, Json<ErrorResponse>)> {
     let maybe_proof = {
-        let tree = state.tree.write().await;
+        let tree = state.tree.read().await;
         tree.get_proof(payload.index)
     };
 
@@ -154,7 +154,7 @@ async fn get_proof(
         None => Err((
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
-                error: "Invalid index or tree is empty".to_string(),
+                error: "Invalid index, tree cache invalid, or tree is empty".to_string(),
             }),
         )),
     }

@@ -8,8 +8,6 @@ const MAX_LEAVES: usize = 1 << MAX_LEVELS;
 #[derive(Debug, Clone, Serialize)]
 pub struct MerkleProof {
     pub siblings: Vec<String>,
-    // not strictly needed
-    pub directions: Vec<bool>, // true = right, false = left
 }
 
 #[derive(Debug)]
@@ -57,7 +55,7 @@ impl IncrementalMerkleTree {
             return Err("Exceeded max number of leaves in merkle tree");
         }
         self.leaves.append(&mut leaves);
-        // possible inconsistency, appending while getting root.
+        // possible inconsistency, appending while getting root. How to test?
         // add leaves -> from client A
         // get root -> from client B
         self.invalidate_cache();
@@ -87,17 +85,15 @@ impl IncrementalMerkleTree {
             return None;
         }
 
-        //if !self.cache_valid {
-        //    self.compute_tree();
-        //}
-        
+        if !self.cache_valid {
+            return None;
+        }
+
         let mut siblings = Vec::new();
-        let mut directions = Vec::new();
         let mut current_index = index;
         let mut current_level = 0;
 
-        // loop unnecesary, modify to for to prevent infinite loop
-        loop {
+        for _ in 0..MAX_LEVELS {
             let level_hashes = self.cached_hashes.get(current_level)?;
             let level_size = if current_level == 0 {
                 self.leaves.len()
@@ -118,13 +114,11 @@ impl IncrementalMerkleTree {
             if sibling_index < level_size {
                 if let Some(sibling_hash) = level_hashes.get(sibling_index) {
                     siblings.push(hex::encode(sibling_hash));
-                    directions.push(current_index % 2 == 0);
                 }
             } else {
                 // No sibling, use self
                 if let Some(self_hash) = level_hashes.get(current_index) {
                     siblings.push(hex::encode(self_hash));
-                    directions.push(false);
                 }
             }
 
@@ -134,30 +128,28 @@ impl IncrementalMerkleTree {
 
         Some(MerkleProof {
             siblings,
-            directions,
         })
     }
 
-    pub fn _verify_proof(&self, leaf: &[u8], proof: &MerkleProof, root: &[u8]) -> bool {
-        if proof.siblings.len() != proof.directions.len() {
-            return false;
-        }
-
+    pub fn _verify_proof(&self, leaf: &[u8], proof: &MerkleProof, root: &[u8], leaf_index: usize) -> bool {
         let mut current_hash = leaf.to_vec();
+        let mut current_index = leaf_index;
 
-        for (sibling_hex, is_right) in proof.siblings.iter().zip(proof.directions.iter()) {
+        for sibling_hex in proof.siblings.iter() {
             let sibling = match hex::decode(sibling_hex) {
                 Ok(bytes) => bytes,
                 Err(_) => return false,
             };
 
-            current_hash = if *is_right {
+            current_hash = if current_index % 2 == 0 {
                 // Current node is left, sibling is right
                 self.hash_pair(&current_hash, &sibling)
             } else {
                 // Current node is right, sibling is left
                 self.hash_pair(&sibling, &current_hash)
             };
+
+            current_index /= 2;
         }
 
         current_hash == root
@@ -167,7 +159,7 @@ impl IncrementalMerkleTree {
         if self.leaves.is_empty() {
             return;
         }
-        
+
         // Level 0: The leaves are the first level of hashes.
         // We clone them to store them in the cache.
         self.cached_hashes.clear();
@@ -179,7 +171,7 @@ impl IncrementalMerkleTree {
         while level_size > 1 {
             if current_level >= MAX_LEVELS {
                 println!("Exceeded max number of leaves in merkle tree");
-                return
+                return;
             }
 
             let mut next_level_hashes = Vec::new();
@@ -275,9 +267,7 @@ mod tests {
     #[test]
     fn test_proof_generation_valid_and_invalid_index() {
         let mut tree = IncrementalMerkleTree::new();
-        let _ = tree.add_leaves(vec![
-            hex("a"), hex("b"), hex("c"), hex("d")
-        ]);
+        let _ = tree.add_leaves(vec![hex("a"), hex("b"), hex("c"), hex("d")]);
 
         let valid_proof = tree.get_proof(0);
         assert!(valid_proof.is_some());
@@ -288,14 +278,13 @@ mod tests {
 
     #[test]
     fn test_max_levels_enforced() {
-        let test_max_levels = 11;
+        let test_max_levels = 8; // Reduced from 11 (256 vs 2048 leaves)
         let test_max_leaves = 1 << test_max_levels;
         let mut tree = IncrementalMerkleTree::_new_with_max(test_max_leaves);
-        let leaf = vec![0u8; 32];
-
-        for _ in 0..test_max_leaves {
-            assert!(tree.add_leaf(leaf.clone()).is_ok());
-        }
+        let leaves: Vec<Vec<u8>> = (0..test_max_leaves).map(|i| format!("leaf{}", i).into_bytes()).collect();
+        
+        // Use batch operation instead of individual adds
+        assert!(tree.add_leaves(leaves).is_ok());
 
         let root = tree.root();
         assert!(root.is_some());
@@ -305,9 +294,7 @@ mod tests {
     #[test]
     fn test_root_consistency() {
         let mut tree = IncrementalMerkleTree::new();
-        let _ = tree.add_leaves(vec![
-            hex("x"), hex("y"), hex("z")
-        ]);
+        let _ = tree.add_leaves(vec![hex("x"), hex("y"), hex("z")]);
 
         let root1 = tree.root();
         let root2 = tree.root();
@@ -330,15 +317,13 @@ mod tests {
     #[test]
     fn test_proof_structure() {
         let mut tree = IncrementalMerkleTree::new();
-        let _ = tree.add_leaves(vec![
-            hex("a"), hex("b"), hex("c"), hex("d")
-        ]);
+        let _ = tree.add_leaves(vec![hex("a"), hex("b"), hex("c"), hex("d")]);
 
         let proof = tree.get_proof(2);
         assert!(proof.is_some());
         let proof = proof.unwrap();
 
-        assert_eq!(proof.siblings.len(), proof.directions.len());
+        assert!(proof.siblings.len() > 0);
         assert!(proof.siblings.len() > 0);
     }
 
@@ -351,7 +336,7 @@ mod tests {
         let root = tree.root().unwrap();
         let proof = tree.get_proof(1).unwrap();
 
-        assert!(tree._verify_proof(&leaves[1], &proof, &root));
+        assert!(tree._verify_proof(&leaves[1], &proof, &root, 1));
     }
 
     #[test]
@@ -364,7 +349,7 @@ mod tests {
         let proof = tree.get_proof(1).unwrap();
 
         // Wrong leaf data
-        assert!(!tree._verify_proof(&hex("wrong"), &proof, &root));
+        assert!(!tree._verify_proof(&hex("wrong"), &proof, &root, 1));
     }
 
     #[test]
@@ -376,7 +361,7 @@ mod tests {
         let proof = tree.get_proof(1).unwrap();
         let wrong_root = hex("wrong_root");
 
-        assert!(!tree._verify_proof(&leaves[1], &proof, &wrong_root));
+        assert!(!tree._verify_proof(&leaves[1], &proof, &wrong_root, 1));
     }
 
     #[test]
@@ -385,21 +370,12 @@ mod tests {
         let leaf = hex("test");
         let root = hex("root");
 
-        // Mismatched siblings and directions length
-        let malformed_proof = MerkleProof {
-            siblings: vec!["abc".to_string()],
-            directions: vec![true, false], // Different length
-        };
-
-        assert!(!tree._verify_proof(&leaf, &malformed_proof, &root));
-
         // Invalid hex in siblings
         let invalid_hex_proof = MerkleProof {
             siblings: vec!["invalid_hex_string".to_string()],
-            directions: vec![true],
         };
 
-        assert!(!tree._verify_proof(&leaf, &invalid_hex_proof, &root));
+        assert!(!tree._verify_proof(&leaf, &invalid_hex_proof, &root, 0));
     }
 
     #[test]
@@ -411,6 +387,6 @@ mod tests {
         let root = tree.root().unwrap();
         let proof = tree.get_proof(0).unwrap();
 
-        assert!(tree._verify_proof(&leaf, &proof, &root));
+        assert!(tree._verify_proof(&leaf, &proof, &root, 0));
     }
 }

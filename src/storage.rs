@@ -22,7 +22,7 @@ impl LmdbStorage {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let env = Environment::new()
             .set_flags(EnvironmentFlags::NO_SUB_DIR)
-            .set_max_dbs(3)
+            .set_max_dbs(4)
             .set_map_size(1024 * 1024 * 1024) // 1GB
             .open(path.as_ref())?;
 
@@ -221,5 +221,32 @@ impl LmdbStorage {
     pub fn sync(&self) -> Result<(), Box<dyn std::error::Error>> {
         self.env.sync(true)?;
         Ok(())
+    }
+
+    pub fn store_node(
+        &self,
+        level: usize,
+        index: u64,
+        hash: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut txn = self.env.begin_rw_txn()?;
+        let key = format!("{:02}:{:016x}", level, index);
+        txn.put(self.cache_db, &key, &hash, WriteFlags::empty())?;
+        txn.commit()?;
+        Ok(())
+    }
+
+    pub fn get_node(
+        &self,
+        level: usize,
+        index: u64,
+    ) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
+        let txn = self.env.begin_ro_txn()?;
+        let key = format!("{:02}:{:016x}", level, index);
+        match txn.get(self.cache_db, &key) {
+            Ok(data) => Ok(Some(data.to_vec())),
+            Err(lmdb::Error::NotFound) => Ok(None),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 }

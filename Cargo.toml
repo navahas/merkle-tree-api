@@ -23,6 +23,8 @@ reqwest = { version = "0.12.22", features = ["json"] }
 rand = "0.9.2"
 serde_json = "1.0.141"
 tempfile = "3.8.1"
+futures = "0.3.31"
+tokio = { version = "1.46.1", features = ["full"] }
 
 [[bench]]
 name = "api_benchmark"
@@ -30,5 +32,13 @@ harness = false
 
 [[bench]]
 name = "plot_benchmark"
+harness = false
+
+[[bench]]
+name = "tree_implementation_benchmark"
+harness = false
+
+[[bench]]
+name = "api_concurrency_benchmark"
 harness = false
 

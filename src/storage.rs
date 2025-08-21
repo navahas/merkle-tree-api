@@ -8,7 +8,6 @@ use std::path::Path;
 pub struct TreeMetadata {
     pub num_leaves: usize,
     pub max_leaves: usize,
-    pub cache_valid: bool,
 }
 
 #[derive(Debug)]

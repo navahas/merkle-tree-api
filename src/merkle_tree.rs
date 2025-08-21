@@ -241,7 +241,7 @@ impl IncrementalMerkleTree {
         if let Some(ref storage) = self.storage {
             if let Some(metadata) = storage.get_metadata()? {
                 self.max_leaves = metadata.max_leaves;
-                self.cache_valid = metadata.cache_valid;
+                self.cache_valid = self.cache_valid;
             }
 
             self.leaves = storage.get_all_leaves()?;
@@ -256,7 +256,6 @@ impl IncrementalMerkleTree {
             let metadata = TreeMetadata {
                 num_leaves: self.leaves.len(),
                 max_leaves: self.max_leaves,
-                cache_valid: self.cache_valid,
             };
 
             let _ = storage.store_metadata(&metadata);
@@ -275,7 +274,6 @@ impl IncrementalMerkleTree {
             let metadata = TreeMetadata {
                 num_leaves: self.leaves.len(),
                 max_leaves: self.max_leaves,
-                cache_valid: self.cache_valid,
             };
 
             storage.store_leaves_batch(&self.leaves)?;

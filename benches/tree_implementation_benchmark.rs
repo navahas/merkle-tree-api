@@ -1,8 +1,8 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use std::hint::black_box;
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use merkle_tree_api::lmdb_tree::LmdbMerkleTree;
 use merkle_tree_api::merkle_tree::IncrementalMerkleTree;
-use rand::{random, Rng};
+use rand::{Rng, random};
+use std::hint::black_box;
 use tempfile::TempDir;
 
 fn generate_test_data(size: usize) -> Vec<Vec<u8>> {

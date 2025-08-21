@@ -1,10 +1,10 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use futures::future::join_all;
-use rand::{random, Rng};
+use rand::{Rng, random};
 use reqwest::Client;
 use serde_json::json;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -237,8 +237,5 @@ fn bench_concurrent_reads(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    api_benches,
-    bench_concurrent_reads
-);
+criterion_group!(api_benches, bench_concurrent_reads);
 criterion_main!(api_benches);

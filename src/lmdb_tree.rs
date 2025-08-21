@@ -164,7 +164,6 @@ impl LmdbMerkleTree {
             let metadata = TreeMetadata {
                 num_leaves: 0,
                 max_leaves: self.max_leaves,
-                cache_valid: true,
             };
             self.storage.store_metadata(&metadata)?;
             return Ok(());
@@ -203,7 +202,6 @@ impl LmdbMerkleTree {
         let metadata = TreeMetadata {
             num_leaves: leaves.len(),
             max_leaves: self.max_leaves,
-            cache_valid: true,
         };
         self.storage.store_metadata(&metadata)?;
         self.storage.sync()?;

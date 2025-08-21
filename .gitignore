@@ -2,5 +2,5 @@
 **/*.bak
 /tasks
 .claude
-merkle_tree.db
-merkle_tree.db-lock
+*.db
+*.db-lock

@@ -16,25 +16,28 @@ pub struct LmdbStorage {
     leaves_db: Database,
     cache_db: Database,
     metadata_db: Database,
+    key_leaves_db: Database,
 }
 
 impl LmdbStorage {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let env = Environment::new()
             .set_flags(EnvironmentFlags::NO_SUB_DIR)
-            .set_max_dbs(4)
+            .set_max_dbs(5)
             .set_map_size(1024 * 1024 * 1024) // 1GB
             .open(path.as_ref())?;
 
         let leaves_db = env.create_db(Some("leaves"), DatabaseFlags::empty())?;
         let cache_db = env.create_db(Some("cache"), DatabaseFlags::empty())?;
         let metadata_db = env.create_db(Some("metadata"), DatabaseFlags::empty())?;
+        let key_leaves_db = env.create_db(Some("key_leaves"), DatabaseFlags::empty())?;
 
         Ok(Self {
             env,
             leaves_db,
             cache_db,
             metadata_db,
+            key_leaves_db,
         })
     }
 
@@ -214,6 +217,7 @@ impl LmdbStorage {
         txn.clear_db(self.leaves_db)?;
         txn.clear_db(self.cache_db)?;
         txn.clear_db(self.metadata_db)?;
+        txn.clear_db(self.key_leaves_db)?;
         txn.commit()?;
         Ok(())
     }
@@ -250,7 +254,10 @@ impl LmdbStorage {
         }
     }
 
-    pub fn store_path_batch(&self, path_updates: &[(usize, u64, Vec<u8>)]) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn store_path_batch(
+        &self,
+        path_updates: &[(usize, u64, Vec<u8>)],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut txn = self.env.begin_rw_txn()?;
         for (level, index, hash) in path_updates {
             let key = format!("{:02}:{:016x}", level, index);
@@ -258,5 +265,38 @@ impl LmdbStorage {
         }
         txn.commit()?;
         Ok(())
+    }
+
+    pub fn store_leaf_node(
+        &self,
+        key_hash: &[u8],
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut txn = self.env.begin_rw_txn()?;
+        let leaf_data = bincode::serialize(&(key.to_vec(), value.to_vec()))?;
+        txn.put(
+            self.key_leaves_db,
+            &key_hash,
+            &leaf_data,
+            WriteFlags::empty(),
+        )?;
+        txn.commit()?;
+        Ok(())
+    }
+
+    pub fn get_leaf_by_key_hash(
+        &self,
+        key_hash: &[u8],
+    ) -> Result<Option<(Vec<u8>, Vec<u8>)>, Box<dyn std::error::Error>> {
+        let txn = self.env.begin_ro_txn()?;
+        match txn.get(self.key_leaves_db, &key_hash) {
+            Ok(data) => {
+                let (key, value): (Vec<u8>, Vec<u8>) = bincode::deserialize(data)?;
+                Ok(Some((key, value)))
+            }
+            Err(lmdb::Error::NotFound) => Ok(None),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 }

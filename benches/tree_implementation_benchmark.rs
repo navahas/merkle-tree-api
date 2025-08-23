@@ -34,7 +34,8 @@ fn setup_sparse_tree_with_data(size: usize) -> (SparseMerkleTree, TempDir) {
     let mut tree = SparseMerkleTree::new(db_path.to_str().unwrap()).unwrap();
     let leaves = generate_test_data(size);
     for (i, leaf) in leaves.into_iter().enumerate() {
-        tree.add_leaf(i as u64, leaf).unwrap();
+        let key = format!("key_{}", i).into_bytes();
+        tree.set(&key, &leaf).unwrap();
     }
     (tree, temp_dir)
 }
@@ -101,14 +102,16 @@ fn bench_write_operations(c: &mut Criterion) {
                         if size > 1 {
                             let initial_leaves = generate_test_data(size - 1);
                             for (i, leaf) in initial_leaves.into_iter().enumerate() {
-                                tree.add_leaf(i as u64, leaf).unwrap();
+                                let key = format!("key_{}", i).into_bytes();
+                                tree.set(&key, &leaf).unwrap();
                             }
                         }
                         (tree, temp_dir)
                     },
                     |(mut tree, _temp_dir)| {
                         let leaf = format!("new_leaf_{:08x}", random::<u32>()).into_bytes();
-                        tree.add_leaf(black_box(size as u64), black_box(leaf)).unwrap();
+                        let key = format!("key_{}", size).into_bytes();
+                        tree.set(black_box(&key), black_box(&leaf)).unwrap();
                     },
                 );
             },
@@ -164,7 +167,8 @@ fn bench_write_operations(c: &mut Criterion) {
                     |(mut tree, _temp_dir)| {
                         let leaves = generate_test_data(batch_size);
                         for (i, leaf) in leaves.into_iter().enumerate() {
-                            tree.add_leaf(black_box(i as u64), black_box(leaf)).unwrap();
+                            let key = format!("key_{}", i).into_bytes();
+                            tree.set(black_box(&key), black_box(&leaf)).unwrap();
                         }
                     },
                 );
@@ -288,8 +292,9 @@ fn bench_read_operations(c: &mut Criterion) {
                         || setup_sparse_tree_with_data(tree_size),
                         |(tree, _temp_dir)| {
                             let mut rng = rand::rng();
-                            let index = rng.random_range(0..tree_size as u64);
-                            black_box(tree.get_proof(black_box(index)));
+                            let index = rng.random_range(0..tree_size);
+                            let key = format!("key_{}", index).into_bytes();
+                            black_box(tree.get_proof(black_box(&key)));
                         },
                     );
                 },
@@ -371,18 +376,18 @@ fn bench_proof_verification(c: &mut Criterion) {
                         let (tree, temp_dir) = setup_sparse_tree_with_data(tree_size);
                         let leaves = generate_test_data(tree_size);
                         let mut rng = rand::rng();
-                        let index = rng.random_range(0..tree_size as u64);
-                        let leaf = &leaves[index as usize];
-                        let proof = tree.get_proof(index).unwrap();
+                        let index = rng.random_range(0..tree_size);
+                        let key = format!("key_{}", index).into_bytes();
+                        let leaf = &leaves[index];
+                        let proof = tree.get_proof(&key).unwrap();
                         let root = tree.get_root().unwrap();
-                        (tree, temp_dir, leaf.clone(), proof, root, index)
+                        (tree, temp_dir, key.clone(), leaf.clone(), proof, root)
                     },
-                    |(tree, _temp_dir, leaf, proof, root, index)| {
+                    |(tree, _temp_dir, key, _leaf, proof, root)| {
                         black_box(tree.verify_proof(
-                            black_box(&leaf),
+                            black_box(&key),
                             black_box(&proof),
                             black_box(&root),
-                            black_box(index),
                         ));
                     },
                 );
@@ -446,7 +451,8 @@ fn bench_scaling_performance(c: &mut Criterion) {
                     |(mut tree, _temp_dir)| {
                         let leaves = generate_test_data(tree_size);
                         for (i, leaf) in leaves.into_iter().enumerate() {
-                            tree.add_leaf(black_box(i as u64), black_box(leaf)).unwrap();
+                            let key = format!("key_{}", i).into_bytes();
+                            tree.set(black_box(&key), black_box(&leaf)).unwrap();
                         }
                         black_box(tree.get_root());
                     },

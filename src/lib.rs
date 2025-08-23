@@ -1,8 +1,10 @@
 pub mod lmdb_tree;
 pub mod merkle_tree;
 pub mod sparse_merkle_tree;
+pub mod optimized_sparse_tree;
 pub mod storage;
 pub use lmdb_tree::*;
 pub use merkle_tree::*;
 pub use sparse_merkle_tree::*;
+pub use optimized_sparse_tree::*;
 pub use storage::*;

@@ -39,6 +39,10 @@ name = "tree_implementation_benchmark"
 harness = false
 
 [[bench]]
+name = "sparse_tree_complexity_benchmark"
+harness = false
+
+[[bench]]
 name = "api_concurrency_benchmark"
 harness = false
 

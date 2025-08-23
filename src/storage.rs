@@ -249,4 +249,14 @@ impl LmdbStorage {
             Err(e) => Err(Box::new(e)),
         }
     }
+
+    pub fn store_path_batch(&self, path_updates: &[(usize, u64, Vec<u8>)]) -> Result<(), Box<dyn std::error::Error>> {
+        let mut txn = self.env.begin_rw_txn()?;
+        for (level, index, hash) in path_updates {
+            let key = format!("{:02}:{:016x}", level, index);
+            txn.put(self.cache_db, &key, hash, WriteFlags::empty())?;
+        }
+        txn.commit()?;
+        Ok(())
+    }
 }

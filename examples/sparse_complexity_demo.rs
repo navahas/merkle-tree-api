@@ -1,4 +1,4 @@
-use merkle_tree_api::{SparseMerkleTree, OptimizedSparseMerkleTree};
+use merkle_tree_api::{SparseMerkleTree};
 use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
